@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Web Audio Visualizer</title>
+    <link href="https://fonts.googleapis.com/css?family=Amatic+SC" rel="stylesheet">
+    <style>
+        body {
+            background: #478D76;
+            font-family: 'Amatic SC', cursive;
+        }
+
+        header {
+            text-align: center;
+            font-size: 40px;
+        }
+
+        canvas {
+            margin-left: 10px;
+            margin-top: 10px;
+            box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.5);
+            background: black;
+        }
+
+        #controls {
+            margin-left: 10px;
+            margin-top: 10px;
+        }
+
+        option {
+            font-family: 'Amatic SC', cursive;
+        }
+
+        input {
+            margin-left: 10px;
+            display: inline-block;
+        }
+
+        #myRange {
+            display: inline-block;
+        }
+
+        select {
+            padding: 8px 8px 8px 32px;
+            text-decoration: none;
+            font-size: 25px;
+
+            color: #818181;
+            display: block;
+            position: center;
+            transition: 0.3s;
+        }
+
+        label {
+            padding: 8px 8px 8px 32px;
+            text-decoration: none;
+            font-size: 25px;
+
+            color: #818181;
+            display: inline-block;
+            position: center;
+            transition: 0.3s;
+        }
+
+        .sidenav {
+            height: 100%;
+
+            width: 0;
+
+            position: fixed;
+
+            z-index: 1;
+
+            top: 0;
+
+            left: 0;
+            background-color: #111;
+
+            overflow-x: hidden;
+
+            padding-top: 60px;
+
+            transition: 0.5s;
+
+        }
+
+
+
+        .sidenav a {
+            padding: 8px 8px 8px 32px;
+            text-decoration: none;
+            font-size: 25px;
+
+            color: #818181;
+            display: inline-block;
+            position: center;
+            transition: 0.3s;
+        }
+
+
+
+        .sidenav a:hover {
+            color: #f1f1f1;
+        }
+
+
+        .sidenav .closebtn {
+            position: absolute;
+            top: 0;
+            right: 25px;
+            font-size: 36px;
+            margin-left: 50px;
+        }
+
+
+        #main {
+            transition: margin-left .5s;
+            padding: 20px;
+        }
+
+
+
+        @media screen and (max-height: 450px) {
+            .sidenav {
+                padding-top: 15px;
+            }
+            .sidenav a {
+                font-size: 18px;
+            }
+        }
+
+    </style>
+    <script>
+        "use strict";
+
+        function openNav() {
+            document.getElementById("mySidenav").style.width = "20%";
+        }
+
+
+        function closeNav() {
+            document.getElementById("mySidenav").style.width = "0";
+        }
+
+
+        (function() {
+            "use strict";
+
+
+            function init() {
+                (function() {
+                        var canvas = document.querySelector('canvas'),
+                            ctx = canvas.getContext('2d'),
+                            width = window.innerWidth - 35,
+                            height = window.innerHeight - 200,
+                            tint = false,
+                            wind = 4,
+                            holder = [],
+                            gainNode,
+                            handler = '',
+                            analyzerNode,
+                            colors = [],
+                            movement = 0,
+                            audioElement = document.querySelector('audio'),
+
+                            //color array for the theme of the page
+                            colors = ['#71AA97', '#478D76', '#17A073', '#0E553E', '#234339'],
+                            //starting location of the source of the circles
+                            outputSource = {
+                                x: width - 50,
+                                y: height - 1000
+                            };
+                        //calls default functions so that it runs on load.
+                        createWebAudioContextWithAnalyserNode(audioElement);
+
+                        setupUI();
+
+                        playStream(audioElement, 'media/8pm.mp3');
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.fillRect(0, 0, width, height);
+                        //function for creating and setting values for the tiny circles
+                        function Circle(pos) {
+
+                            this.x = pos.x;
+                            this.y = pos.y;
+                            this.radius = Math.round(Math.random() * 2);
+                            this.life = Math.round(Math.random() * 10000);
+                            this.velocity = (Math.random() > 0.5) ? Math.random() / 2 : -Math.random() / 2;
+                            this.traction = Math.round(Math.random() * wind - 3);
+
+
+
+                        }
+                        //function for changing tint of screen by the pixel being hovered by the mouse
+                        function manipulatePixel(event) {
+
+                            if (document.getElementById("invert").checked == true) {
+                                //gets image data
+                                var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                                var data = imageData.data;
+                                //gets mouse x and y
+                                var x = event.x;
+                                var y = event.y;
+                                //gets pixel at x and y
+                                var pixel = ctx.getImageData(x, y, 1, 1);
+
+                                var data = pixel.data;
+                                //sets rgba value to the value of that pixel
+                                var rgba = 'rgba(' + data[0] + ', ' + data[1] + ', ' + data[2] + ', ' + .75 + ')';
+
+
+                                //draws opaque rectangle covering the canvas, creating the tint
+                                ctx.rect(0, 0, canvas.width, canvas.height);
+                                ctx.fillStyle = rgba;
+                                ctx.fill();
+                                ctx.stroke();
+
+
+                            }
+
+                        }
+                        //function to draw and instantiate the circles at the location of the output source
+                        function create() {
+
+                            holder.push(new Circle({
+                                x: outputSource.x,
+                                y: outputSource.y
+                            }));
+
+
+                        }
+
+                        function draw() {
+                            var i = 50;
+                            while (i--) {
+                                create();
+                            }
+
+                            ctx.globalCompositeOperation = 'source-over';
+                            //creates basic canvas
+                            ctx.fillStyle = '#003926';
+                            ctx.fillRect(0, 0, width, height);
+                            //gets analyzer ifno
+                            var array = new Uint8Array(analyzerNode.frequencyBinCount);
+                            analyzerNode.getByteFrequencyData(array);
+                            var averageVolume = getAverageVolume(array);
+
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.lineWidth = 3;
+                            var pieceWidth = width * 10 / analyzerNode.frequencyBinCount;
+                            var xPos = -10;
+                            //creates the line across the screen by subdiving it into parts by pice width
+                            for (var i = 0; i < analyzerNode.frequencyBinCount; i++) {
+
+                                var v = array[i] / 128.0;
+                                var y = v * height / 2;
+
+                                if (i === 0) {
+                                    ctx.moveTo(xPos, y);
+                                } else {
+                                    ctx.lineTo(xPos, y);
+                                }
+
+                                xPos += pieceWidth;
+                            }
+                            ctx.lineTo(canvas.width, canvas.height / 2);
+                            ctx.stroke();
+                            ctx.closePath();
+                            ctx.restore();
+                            ctx.save();
+
+
+                            ctx.beginPath();
+                            ctx.moveTo(width, 0);
+                            //creates and assigns the gradient to the quadratic curves
+                            var myGradient = ctx.createLinearGradient(113, 170, 151, 0);
+                            myGradient.addColorStop(0, "#71AA97");
+                            myGradient.addColorStop(.5, "#17A073");
+                            myGradient.addColorStop(1, "#234339");
+                            ctx.strokeStyle = myGradient;
+                            //draws quadratics which their height is adjusted based off the average volume of the song being player
+                            ctx.quadraticCurveTo(averageVolume, height * (2 / 4), width, height);
+                            ctx.moveTo(width, 0)
+                            ctx.quadraticCurveTo(averageVolume - 600, height * (2 / 4), width, height);
+                            ctx.moveTo(width, 0)
+                            ctx.quadraticCurveTo(averageVolume - 1200, height * (2 / 4), width, height);
+                            ctx.stroke();
+
+                            ctx.closePath();
+                            ctx.restore();
+                            ctx.moveTo(0, 0);
+
+                            var partNum = holder.length;
+                            //for loop for creating the circles that fly across the screen with the beat.
+                            for (var i = 0; i < partNum; i++) {
+
+                                var temp = holder[i];
+                                if (temp === undefined) continue;
+
+                                ctx.fillStyle = findColor(temp.life);
+                                ctx.beginPath();
+                                ctx.arc(temp.x - movement, temp.y, temp.radius, 0, Math.PI * 2, true);
+                                ctx.fill();
+                                temp.x -= wind - temp.traction;
+                                temp.life -= 40;
+                                temp.y -= temp.velocity;
+                                if (temp === undefined) console.log('un')
+                                if (temp.life < 0 || temp.x < 0) {
+                                    holder.splice(i, 1);
+                                }
+
+                            }
+
+                            ctx.strokeStyle = '#71AA97';
+                            ctx.fillStyle = '#71AA97';
+                            ctx.arc(outputSource.x - movement, outputSource.y, 3, 0, Math.PI * 2, true);
+                            ctx.fill();
+                            //checks for mouse movement and gets pixel data for the tint
+                            canvas.addEventListener('mousemove', manipulatePixel);
+                            //checks if blue or red tint is selected, and draws the corresponding opaque rectangle over the canvas
+                            if (document.getElementById("bluetint").checked == true) {
+                                var rgba = 'rgba(' + 0 + ', ' + 0 + ', ' + 200 + ', ' + .25 + ')';
+
+
+
+                                ctx.rect(0, 0, canvas.width, canvas.height);
+                                ctx.fillStyle = rgba;
+                                ctx.fill();
+                                ctx.stroke();
+                            }
+
+                            if (document.getElementById("redtint").checked == true) {
+                                var rgba = 'rgba(' + 250 + ', ' + 0 + ', ' + 0 + ', ' + .25 + ')';
+
+
+
+                                ctx.rect(0, 0, canvas.width, canvas.height);
+                                ctx.fillStyle = rgba;
+                                ctx.fill();
+                                ctx.stroke();
+                            }
+
+                            //draws and sets the height of the output source based on audio frequency data
+                            var array = new Uint8Array(analyzerNode.frequencyBinCount);
+                            analyzerNode.getByteFrequencyData(array);
+                            var average = getAverageVolume(array)
+                            //Changes output position
+                            outputSource.y = height / 1.5 - average * .5;
+
+
+                        }
+
+                        function createBackground() {
+                            ctx.beginPath();
+                            ctx.arc(outputSource.x, outputSource.y, 3, 0, Math.PI * 2, true);
+                            ctx.fill();
+                            handler = setInterval(draw, 40);
+                        }
+                        //function for giving the circles color based on how long theyve been on the screen
+                        function findColor(life) {
+                            if (life < 2000) {
+                                return colors[4];
+                            } else if (life < 4000) {
+                                return colors[3];
+                            } else if (life < 6000) {
+                                return colors[2];
+                            } else if (life < 8000) {
+                                return colors[1];
+                            } else {
+                                return colors[0];
+                            }
+                        }
+                        createBackground();
+
+
+
+                        var context,
+                            source,
+                            soundBuffer,
+                            analyser,
+                            javascriptNode,
+                            url = "media/sound.mp3",
+                            audio;
+
+
+                        //function to get average volume of the array passed int
+                        function getAverageVolume(array) {
+                            var values = 0,
+                                average,
+                                length = array.length;
+                            //Gets amplitudes then averages them out
+                            for (var i = 0; i < length; i++) {
+                                values += array[i];
+                            }
+                            return values * 5 / length;;
+                        }
+
+
+
+                        function createWebAudioContextWithAnalyserNode(audioElement) {
+                            var audioCtx, sourceNode;
+
+                            audioCtx = new(window.AudioContext || window.webkitAudioContext);
+
+
+
+                            analyzerNode = audioCtx.createAnalyser();
+                            gainNode = audioCtx.createGain();
+
+                            //sets default gain node value
+                            gainNode.gain.value = 10;
+
+
+                            analyzerNode.fftSize = 256;
+
+
+                            sourceNode = audioCtx.createMediaElementSource(audioElement);
+                            sourceNode.connect(analyzerNode);
+
+                            //adds gain node, and connexts it to the final destination
+                            analyzerNode.connect(gainNode);
+                            gainNode.connect(audioCtx.destination);
+
+
+                            return analyzerNode;
+                        }
+                        //plays audio stream
+                        function playStream(audioElement, path) {
+                            audioElement.src = path;
+                            audioElement.play();
+                            audioElement.volume = 0.2;
+
+                        }
+
+                        function setupUI() {
+                            //gets reference to the ui elements on the screen and allows function to be called on interaction
+                            document.querySelector("#trackSelect").onchange = function(e) {
+                                playStream(audioElement, e.target.value);
+                            };
+                            document.querySelector("#windSelect").onchange = function(e) {
+                                wind = e.target.value;
+                            };
+                            document.querySelector("#myRange").onchange = function(e) {
+                                movement = e.target.value;
+                            };
+                            document.querySelector("#myGain").onchange = function(e) {
+                                gainNode.gain.value = e.target.value;
+                            };
+
+
+
+                        };
+
+
+                    }
+                    ());
+            }
+
+
+
+
+            window.addEventListener("load", init);
+        }());
+
+    </script>
+</head>
+
+<body>
+    <header> Chase Slattery Web Audio Visualizer</header>
+    <canvas id="canvas" width="window.innerWidth" height="window.innerHeight"></canvas>
+
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+
+        <a href="#">Current Track</a>
+        <audio controls loop></audio>
+        <select id="trackSelect">
+				<option value="media/8pm.mp3">8pm</option>
+				<option value="media/11pm.mp3">11pm</option>
+				<option value="media/MainStreet.mp3">Main Street</option>
+			</select>
+        <a href="#">Speed</a>
+        <select id="windSelect">
+				<option value="4">Breezy</option>
+				<option value="10">Windy</option>
+				<option value="30">Hurricane</option>
+			</select>
+        <a href="#">Emitter Position</a>
+        <input type="range" min="50" max="1000" value="50" class="slider" id="myRange">
+        <a href="#">Gain</a>
+        <input type="range" min="0" max="1000" value="1" class="slider" id="myGain">
+        <label></label>
+        <label for="invert"> Position Tint</label>
+        <input type="checkbox" id="invert">
+        <label for="tint"> Blue Tint</label>
+        <input type="checkbox" id="bluetint">
+        <label for="tint"> Red Tint</label>
+        <input type="checkbox" id="redtint">
+
+
+
+    </div>
+
+
+    <button onclick="openNav()">Menu</button>
+
+
+
+</body>
+
+</html>
